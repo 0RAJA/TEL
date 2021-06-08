@@ -50,8 +50,6 @@ func Handle(conn net.Conn) {
 			global_client.PasswordOK <- AtoB(message)
 		case common.MyFile:
 			go ReceiveFile(message)
-		case common.MyQuit:
-			global_client.QuitOK <- true
 		}
 	}
 	for {
@@ -126,6 +124,8 @@ func TestAccount(conn net.Conn) bool {
 					continue
 				}
 			}
+		case "3":
+			return false
 		default:
 			fmt.Println("输入有误,请重新输入")
 		}

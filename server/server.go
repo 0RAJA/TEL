@@ -85,7 +85,6 @@ func Handle(pkg string, client *global_server.Client, MMS *global_server.Message
 			InAndOut(client.Name, global_server.In)
 		}
 	case MyQuit:
-		_ = reply(conn, MyQuit, OK)
 		return errors.New(MyQuit)
 	case MyMessage:
 		controller.HandleMessage(client, *MMS, message)

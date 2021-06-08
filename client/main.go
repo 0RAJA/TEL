@@ -64,6 +64,5 @@ func enterTheStr(inputReader *bufio.Reader) string {
 
 func Quit(conn net.Conn) {
 	_ = controller.SendStr(conn, common.MyQuit+common.Sep+common.OK)
-	<-global.QuitOK
 	fmt.Println("再见")
 }

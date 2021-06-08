@@ -20,7 +20,6 @@ var (
 	NameOK     = make(chan bool)
 	PasswordOK = make(chan bool)
 	SwtOK      = make(chan bool)
-	QuitOK     = make(chan bool)
 )
 
 // FileFlag 确定是不是私聊模式,保证文件给一个人

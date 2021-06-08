@@ -3,7 +3,7 @@ package main
 import (
 	. "PHONE/common"
 	"PHONE/server/controller"
-	"PHONE/server/global"
+	"PHONE/server/global_server"
 	"PHONE/server/model/Person"
 	"bufio"
 	"database/sql"
@@ -41,9 +41,13 @@ func main() {
 func process(conn net.Conn, DB *sql.DB) {
 	defer conn.Close()
 	var (
-		MMS    global.Message
-		client global.Client
+		MMS    global_server.Message
+		client global_server.Client
 	)
+	defer func() {
+		delete(global_server.OnlineMap, client.Ip)
+		InAndOut(client.Name, global_server.Out)
+	}()
 	for {
 		readBuf := bufio.NewReaderSize(conn, SendMaxSize)
 		for {
@@ -51,7 +55,9 @@ func process(conn net.Conn, DB *sql.DB) {
 			if err != nil {
 				break
 			} else {
-				if Handle(pkg, &client, &MMS, DB, conn) == errors.New(MyQuit) {
+				fmt.Println(pkg)
+				if Handle(pkg, &client, &MMS, DB, conn) != nil {
+					fmt.Println(client.Name)
 					return
 				}
 			}
@@ -62,25 +68,24 @@ func process(conn net.Conn, DB *sql.DB) {
 func removeCMD(pkg string) (cmd string, message string) {
 	list := strings.Split(pkg, Sep)
 	cmd = list[0]
-	message = strings.Join(list[1:], "")
+	message = strings.Join(list[1:], Sep)
 	return cmd, message
 }
 
-func Handle(pkg string, client *global.Client, MMS *global.Message, DB *sql.DB, conn net.Conn) error {
+func Handle(pkg string, client *global_server.Client, MMS *global_server.Message, DB *sql.DB, conn net.Conn) error {
 	cmd, message := removeCMD(pkg)
 	switch cmd {
 	case TestAccount:
-		if controller.HandleAccount(conn, DB, pkg, client, MMS) != true {
+		if controller.HandleAccount(conn, DB, message, client, MMS) != true {
 			_ = reply(conn, TestAccount, NO)
 		} else {
 			_ = reply(conn, TestAccount, OK)
-			global.OnlineMap[client.Ip] = *client
+			global_server.OnlineMap[client.Ip] = *client
 			go SynMessage(conn, client)
-			InAndOut(client.Name, global.In)
+			InAndOut(client.Name, global_server.In)
 		}
 	case MyQuit:
-		delete(global.OnlineMap, client.Ip)
-		InAndOut(client.Name, global.Out)
+		_ = reply(conn, MyQuit, OK)
 		return errors.New(MyQuit)
 	case MyMessage:
 		controller.HandleMessage(client, *MMS, message)
@@ -112,7 +117,7 @@ func Handle(pkg string, client *global.Client, MMS *global.Message, DB *sql.DB, 
 }
 
 func reply(conn net.Conn, cmd string, result string) error {
-	err := controller.SendStr(conn, cmd+result)
+	err := controller.SendStr(conn, cmd+Sep+result)
 	if err != nil {
 		return err
 	}
@@ -120,7 +125,7 @@ func reply(conn net.Conn, cmd string, result string) error {
 }
 
 //SynMessage 监听广播站,传回信息
-func SynMessage(conn net.Conn, clint *global.Client) {
+func SynMessage(conn net.Conn, clint *global_server.Client) {
 	for message := range clint.C {
 		err := controller.SendStr(conn, message)
 		if err != nil {
@@ -138,22 +143,22 @@ func inOutStr(name string, str string) string {
 
 //InAndOut 通知登录退出
 func InAndOut(name string, str string) {
-	message := global.Message{
+	message := global_server.Message{
 		Str:     inOutStr(name, str),
-		Pow:     global.PowAll,
+		Pow:     global_server.PowAll,
 		MyIp:    "",
 		OtherIp: "",
 	}
-	global.Msg <- message
+	global_server.Msg <- message
 	OnlineNum()
 }
 
 //OnlineNum 通报当前在线人数
 func OnlineNum() {
-	message := global.Message{
-		Str:     "\t\t\t\t[系统消息]" + "当前在线人数为:" + strconv.Itoa(len(global.OnlineMap)) + "人",
-		Pow:     global.PowAll,
+	message := global_server.Message{
+		Str:     "\t\t\t\t[系统消息]" + "当前在线人数为:" + strconv.Itoa(len(global_server.OnlineMap)) + "人",
+		Pow:     global_server.PowAll,
 		OtherIp: "",
 	}
-	global.Msg <- message
+	global_server.Msg <- message
 }

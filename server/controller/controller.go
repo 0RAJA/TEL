@@ -2,7 +2,7 @@ package controller
 
 import (
 	"PHONE/common"
-	"PHONE/server/global"
+	"PHONE/server/global_server"
 	"PHONE/server/model/Person"
 	"database/sql"
 	"errors"
@@ -21,13 +21,13 @@ func SendStr(conn net.Conn, message string) error {
 }
 
 func checkOnline(name string) (bool, string) {
-	global.Mutex.Lock()
-	for _, client := range global.OnlineMap {
+	//global_server.Mutex.Lock()
+	for _, client := range global_server.OnlineMap {
 		if client.Name == name {
 			return true, client.Ip
 		}
 	}
-	global.Mutex.Unlock()
+	//global_server.Mutex.Unlock()
 	return false, ""
 }
 
@@ -37,7 +37,7 @@ func removeAccount(pkg string) (option string, name string, password string) {
 	return
 }
 
-func HandleAccount(conn net.Conn, DB *sql.DB, pkg string, client *global.Client, MMS *global.Message) bool {
+func HandleAccount(conn net.Conn, DB *sql.DB, pkg string, client *global_server.Client, MMS *global_server.Message) bool {
 	option, name, password := removeAccount(pkg)
 	switch option {
 	case "1":
@@ -60,13 +60,13 @@ func HandleAccount(conn net.Conn, DB *sql.DB, pkg string, client *global.Client,
 	if ok == true {
 		return false
 	}
-	*MMS = global.Message{
+	*MMS = global_server.Message{
 		Str:     "",
-		Pow:     global.PowAll,
+		Pow:     global_server.PowAll,
 		MyIp:    conn.RemoteAddr().String(),
 		OtherIp: "",
 	}
-	*client = global.Client{
+	*client = global_server.Client{
 		Ip:   conn.RemoteAddr().String(),
 		Name: name,
 		C:    make(chan string),
@@ -79,20 +79,20 @@ func messageStr(name string, str string) string {
 	return name + ":" + str
 }
 
-func HandleMessage(client *global.Client, message global.Message, str string) {
+func HandleMessage(client *global_server.Client, message global_server.Message, str string) {
 	message.Str = messageStr(client.Name, str)
-	global.Msg <- message
+	global_server.Msg <- message
 }
 
-func HandleSwt(message *global.Message, otherName string) error {
+func HandleSwt(message *global_server.Message, otherName string) error {
 	if otherName == common.MyAll {
-		message.Pow = global.PowAll
+		message.Pow = global_server.PowAll
 	} else {
 		ok, OtherIp := checkOnline(otherName)
 		if ok != true {
 			return errors.New("NoFind")
 		} else {
-			message.Pow = global.PowOther
+			message.Pow = global_server.PowOther
 			message.OtherIp = OtherIp
 		}
 	}
@@ -100,26 +100,27 @@ func HandleSwt(message *global.Message, otherName string) error {
 }
 
 func showName(oldName, newName string) {
-	message := global.Message{
+	message := global_server.Message{
 		Str:     sysMessage(oldName + "已更名为:" + newName),
-		Pow:     global.PowAll,
+		Pow:     global_server.PowAll,
 		MyIp:    "",
 		OtherIp: "",
 	}
-	global.Msg <- message
+	global_server.Msg <- message
 }
 
-func HandleName(DB *sql.DB, client *global.Client, newName string) error {
+func HandleName(DB *sql.DB, client *global_server.Client, newName string) error {
 	err := Person.ReName(DB, client.Name, newName)
 	if err != nil {
 		return err
 	}
 	showName(client.Name, newName)
 	client.Name = newName
+	global_server.OnlineMap[client.Ip] = *client
 	return nil
 }
 
-func HandlePassword(DB *sql.DB, client *global.Client, newPassword string) error {
+func HandlePassword(DB *sql.DB, client *global_server.Client, newPassword string) error {
 	err := Person.RePassword(DB, client.Name, newPassword)
 	if err != nil {
 		return err
@@ -129,12 +130,13 @@ func HandlePassword(DB *sql.DB, client *global.Client, newPassword string) error
 
 //组装发送文件字符串
 func fileStr(name string, fileStr string) string {
-	return common.MyFile + common.Sep + name + common.Sep + fileStr
+	return name + common.Sep + fileStr
 }
 
-func HandleFile(client *global.Client, message global.Message, str string) {
+func HandleFile(client *global_server.Client, message global_server.Message, str string) {
 	message.Str = fileStr(client.Name, str)
-	global.Msg <- message
+	message.IsFile = true
+	global_server.Msg <- message
 }
 
 // sysMessage 组装系统消息
@@ -144,19 +146,21 @@ func sysMessage(str string) string {
 
 func NetWork() {
 	for {
-		message := <-global.Msg
+		message := <-global_server.Msg
 		switch message.Pow {
-		case global.PowAll:
-			for _, v := range global.OnlineMap {
-				v.C <- message.Str
+		case global_server.PowAll:
+			//global_server.Mutex.Lock()
+			for _, v := range global_server.OnlineMap {
+				v.C <- common.MyMessage + common.Sep + message.Str
 			}
-		case global.PowMe:
-			global.OnlineMap[message.MyIp].C <- message.Str
-		case global.PowOther:
-			for _, v := range global.OnlineMap {
-				if v.Ip != message.MyIp {
-					v.C <- message.Str
-				}
+			//global_server.Mutex.Unlock()
+		case global_server.PowMe:
+			global_server.OnlineMap[message.MyIp].C <- common.MyMessage + common.Sep + message.Str
+		case global_server.PowOther:
+			if message.IsFile == true {
+				global_server.OnlineMap[message.OtherIp].C <- common.MyFile + common.Sep + message.Str
+			} else {
+				global_server.OnlineMap[message.OtherIp].C <- common.MyMessage + common.Sep + "[悄悄话]" + message.Str
 			}
 		}
 	}

@@ -33,9 +33,8 @@ const (
 	NO = "false"
 )
 
-//文件最大字节数
+// SendMaxSize 文件最大字节数
 const (
-	ReceiveMaxSize = 10494760 //最大接受
 	SendMaxSize    = 10495760 //最大发送
 )
 
@@ -81,3 +80,4 @@ func Decode(reader *bufio.Reader) (string, error) {
 	}
 	return string(pack[4:]), nil //拆包返回
 }
+

@@ -1,4 +1,4 @@
-package global
+package global_server
 
 //权限
 const (
@@ -26,4 +26,5 @@ type Message struct {
 	Pow     int    //权限
 	MyIp    string //我的IP
 	OtherIp string //目标IP
+	IsFile  bool   //是否是文件
 }

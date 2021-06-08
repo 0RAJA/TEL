@@ -1,6 +1,6 @@
 package global_server
 
-//权限
+//发送权限
 const (
 	PowAll = iota
 	PowMe
@@ -20,7 +20,7 @@ type Client struct {
 	C    chan string
 }
 
-// Message 信息
+// Message 信息模板
 type Message struct {
 	Str     string //信息
 	Pow     int    //权限

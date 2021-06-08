@@ -35,9 +35,11 @@ const (
 
 // SendMaxSize 文件最大字节数
 const (
-	SendMaxSize    = 10495760 //最大发送
+	SendMaxSize = 10495760 //最大发送
+	Length      = 15
 )
 
+// Sep 分隔符
 const Sep = "->"
 
 // Encode 将消息编码
@@ -80,4 +82,3 @@ func Decode(reader *bufio.Reader) (string, error) {
 	}
 	return string(pack[4:]), nil //拆包返回
 }
-

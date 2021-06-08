@@ -20,6 +20,7 @@ func SendStr(conn net.Conn, message string) error {
 	return nil
 }
 
+//对信息拆包
 func removeMessage(pkg string) (cmd, message string) {
 	list := strings.Split(pkg, common.Sep)
 	cmd = list[0]
@@ -27,6 +28,7 @@ func removeMessage(pkg string) (cmd, message string) {
 	return
 }
 
+// AtoB 将字符串转换为bool值
 func AtoB(str string) bool {
 	if str == common.OK {
 		return true
@@ -34,28 +36,29 @@ func AtoB(str string) bool {
 	return false
 }
 
+// Handle 处理服务器回复
 func Handle(conn net.Conn) {
 	handMessage := func(pkg string) {
 		cmd, message := removeMessage(pkg)
 		switch cmd {
-		case common.TestAccount:
+		case common.TestAccount: //验证账户回复
 			global_client.AccountOK <- AtoB(message)
-		case common.MyMessage:
+		case common.MyMessage: //普通信息
 			fmt.Println(message)
-		case common.MySwt:
+		case common.MySwt: //切换聊天模式回复
 			global_client.SwtOK <- AtoB(message)
-		case common.MyReName:
+		case common.MyReName: //改名回复
 			global_client.NameOK <- AtoB(message)
-		case common.MyRePassword:
+		case common.MyRePassword: //改密码回复
 			global_client.PasswordOK <- AtoB(message)
-		case common.MyFile:
+		case common.MyFile: //收到文件
 			go ReceiveFile(message)
 		}
 	}
 	for {
 		readBuf := bufio.NewReader(conn)
 		for {
-			message, err := common.Decode(readBuf)
+			message, err := common.Decode(readBuf) //拆包
 			if err != nil {
 				break
 			}
@@ -64,17 +67,20 @@ func Handle(conn net.Conn) {
 	}
 }
 
-func IsLegal(str string) bool {
-	if strings.ContainsAny(str, global_client.NotLegalString) || len(str) > 15 {
+// 判断输入是否合法
+func isLegal(str string) bool {
+	if strings.ContainsAny(str, global_client.NotLegalString) || len(str) > common.Length {
 		return false
 	}
 	return true
 }
 
-func PkgAccount(option, name, password string) string {
+// 封装账户名和密码
+func pkgAccount(option, name, password string) string {
 	return common.TestAccount + common.Sep + option + common.Sep + name + common.Sep + password
 }
 
+// TestAccount 验证账户
 func TestAccount(conn net.Conn) bool {
 	var (
 		name     string
@@ -106,15 +112,15 @@ func TestAccount(conn net.Conn) bool {
 					fmt.Println("输入有误,请重新输入")
 					continue
 				}
-				if IsLegal(name) && IsLegal(password) {
-					err := SendStr(conn, PkgAccount(option, name, password))
+				if isLegal(name) && isLegal(password) {
+					err := SendStr(conn, pkgAccount(option, name, password))
 					if err != nil {
 						fmt.Println("登录或注册失败,请重新尝试")
 						continue
 					}
 					ok := <-global_client.AccountOK
 					if ok != true {
-						fmt.Println("登录或注册失败,请重新输入")
+						fmt.Println("登录或注册失败,请重新输入(可能有用户同时在线)")
 					} else {
 						fmt.Println("欢迎" + name + "回来")
 						return true
@@ -132,15 +138,17 @@ func TestAccount(conn net.Conn) bool {
 	}
 }
 
+// SendMessage 发送信息
 func SendMessage(conn net.Conn, message string) {
 	_ = SendStr(conn, common.MyMessage+common.Sep+message)
 }
 
+// SendName 改名
 func SendName(conn net.Conn) {
 	var newName string
 	fmt.Println("输入新的姓名")
 	_, err := fmt.Scan(&newName)
-	if err != nil || IsLegal(newName) != true {
+	if err != nil || isLegal(newName) != true {
 		fmt.Println("姓名输入有误")
 		return
 	}
@@ -153,11 +161,12 @@ func SendName(conn net.Conn) {
 	}
 }
 
+// SendPassword 改密码
 func SendPassword(conn net.Conn) {
 	var newPassword string
 	fmt.Println("输入新的密码")
 	_, err := fmt.Scan(newPassword)
-	if err != nil || IsLegal(newPassword) {
+	if err != nil || isLegal(newPassword) {
 		fmt.Println("输入有误,请核对后输入")
 		return
 	}
@@ -170,6 +179,7 @@ func SendPassword(conn net.Conn) {
 	}
 }
 
+// SendSwt 切换聊天模式
 func SendSwt(conn net.Conn) {
 	var otherName string
 	fmt.Println("输入需要切换的对象")
@@ -192,6 +202,7 @@ func SendSwt(conn net.Conn) {
 	}
 }
 
+// SendFile 传文件
 func SendFile(conn net.Conn) {
 	var path string
 	fmt.Println("输入文件路径")
@@ -225,14 +236,16 @@ func SendFile(conn net.Conn) {
 	fmt.Println("发送成功")
 }
 
-func remove(pkg string) (name, fileName, fileStr string) {
+//对文件信息拆包
+func removeFile(pkg string) (name, fileName, fileStr string) {
 	list := strings.Split(pkg, common.Sep)
 	name, fileName, fileStr = list[0], list[1], strings.Join(list[2:], common.Sep)
 	return
 }
 
+// ReceiveFile 接受文件
 func ReceiveFile(pkg string) {
-	name, fileName, fileStr := remove(pkg)
+	name, fileName, fileStr := removeFile(pkg)
 	file, err := os.Create(global_client.FILEPATH + "\\" + fileName)
 	if err != nil {
 		fmt.Println("您有一个来自", name, "的文件接受失败")

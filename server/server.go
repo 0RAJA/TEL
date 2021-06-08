@@ -57,7 +57,6 @@ func process(conn net.Conn, DB *sql.DB) {
 			} else {
 				fmt.Println(pkg)
 				if Handle(pkg, &client, &MMS, DB, conn) != nil {
-					fmt.Println(client.Name)
 					return
 				}
 			}

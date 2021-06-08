@@ -98,7 +98,7 @@ func TestAccount(conn net.Conn) bool {
 					continue
 				}
 				if name == common.MyQuit {
-					return false
+					break
 				}
 				fmt.Println("输入密码")
 				_, err = fmt.Scan(&password)

@@ -1,10 +1,12 @@
 package Person
 
 import (
+	"crypto/md5"
 	"database/sql"
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"strings"
 )
 
 type Person struct {
@@ -22,6 +24,13 @@ const (
 	ipFormat   = "%s:%s@tcp(%s:%s)/%s?charset=utf8" //格式
 )
 
+func Md5Str(bt [md5.Size]byte) string {
+	result := ""
+	for _, i := range bt {
+		result += string(i)
+	}
+	return strings.ToLower(result)
+}
 func DBInit() (*sql.DB, error) {
 	DB, err := sql.Open(driverName, fmt.Sprintf(ipFormat, userName, passWord, ip, port, dbName))
 	if err != nil {
@@ -36,8 +45,9 @@ func DBInit() (*sql.DB, error) {
 
 // Find 通过name查找返回Person
 func Find(DB *sql.DB, name string) (Person, error) {
+	hashName := Md5Str(md5.Sum([]byte(name)))
 	var person Person
-	rows, err := DB.Query("SELECT `Name`,Password FROM user WHERE binary `Name` = ? ", name)
+	rows, err := DB.Query("SELECT `Name`,Password FROM user WHERE `Name` = ? ", hashName)
 	if err != nil {
 		return person, err
 	}
@@ -53,8 +63,10 @@ func Find(DB *sql.DB, name string) (Person, error) {
 
 // Insert 插入信息
 func Insert(DB *sql.DB, person Person) error {
-	_, err := DB.Exec("INSERT INTO user (`Name`,Password) VALUES (?,?)", person.Name, person.Password)
+	hashName, hashPassword := Md5Str(md5.Sum([]byte(person.Name))), Md5Str(md5.Sum([]byte(person.Password)))
+	_, err := DB.Exec("INSERT INTO user (`Name`,Password) VALUES (?,?)", hashName, hashPassword)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil
@@ -62,7 +74,9 @@ func Insert(DB *sql.DB, person Person) error {
 
 // ReName 修改姓名
 func ReName(DB *sql.DB, oldName string, newName string) error {
-	_, err := DB.Exec("UPDATE user SET `Name` = ? WHERE binary `Name` = ?", newName, oldName)
+	oldHashName := Md5Str(md5.Sum([]byte(oldName)))
+	newHashName := Md5Str(md5.Sum([]byte(newName)))
+	_, err := DB.Exec("UPDATE user SET `Name` = ? WHERE `Name` = ?", newHashName, oldHashName)
 	if err != nil {
 		return err
 	}
@@ -71,7 +85,9 @@ func ReName(DB *sql.DB, oldName string, newName string) error {
 
 // RePassword 修改密码
 func RePassword(DB *sql.DB, Name string, newPassword string) error {
-	_, err := DB.Exec("UPDATE user SET password = ? WHERE binary `name` = ?", newPassword, Name)
+	newHashPassword := Md5Str(md5.Sum([]byte(newPassword)))
+	hashName := Md5Str(md5.Sum([]byte(Name)))
+	_, err := DB.Exec("UPDATE user SET password = ? WHERE `name` = ?", newHashPassword, hashName)
 	if err != nil {
 		return err
 	}

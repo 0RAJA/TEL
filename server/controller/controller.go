@@ -4,6 +4,7 @@ import (
 	"PHONE/common"
 	"PHONE/server/global_server"
 	"PHONE/server/model/Person"
+	"crypto/md5"
 	"database/sql"
 	"errors"
 	"net"
@@ -42,7 +43,11 @@ func HandleAccount(conn net.Conn, DB *sql.DB, pkg string, client *global_server.
 	switch option {
 	case "1":
 		account, err := Person.Find(DB, name)
-		if err != nil || account.Password != password {
+		if err != nil {
+			return false
+		}
+		hashName1 := Person.Md5Str(md5.Sum([]byte(password)))
+		if hashName1 != account.Password {
 			return false
 		}
 	case "2":
